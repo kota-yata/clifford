@@ -2,6 +2,7 @@ package dnsforwarder
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -10,10 +11,7 @@ import (
 	"github.com/miekg/dns"
 )
 
-const (
-	localAddress = "192.168.11.48"
-	localTTL     = 60
-)
+const localTTL = 60
 
 var localNames = map[string]struct{}{
 	"blog.kota-yata.com.": {},
@@ -21,16 +19,21 @@ var localNames = map[string]struct{}{
 }
 
 type Forwarder struct {
-	upstream string
-	timeout  time.Duration
+	upstream     string
+	localAddress net.IP
+	timeout      time.Duration
 }
 
-func New(upstream string, timeout time.Duration) *Forwarder {
-	return &Forwarder{upstream: upstream, timeout: timeout}
+func New(upstream, localAddress string, timeout time.Duration) (*Forwarder, error) {
+	ip := net.ParseIP(localAddress)
+	if ip == nil || ip.To4() == nil {
+		return nil, fmt.Errorf("local address must be an IPv4 address: %q", localAddress)
+	}
+	return &Forwarder{upstream: upstream, localAddress: ip.To4(), timeout: timeout}, nil
 }
 
 func (f *Forwarder) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
-	if response := localResponse(request); response != nil {
+	if response := f.localResponse(request); response != nil {
 		writeResponse(w, response)
 		return
 	}
@@ -71,7 +74,7 @@ func (f *Forwarder) exchange(request *dns.Msg, network string) (*dns.Msg, error)
 	return response, nil
 }
 
-func localResponse(request *dns.Msg) *dns.Msg {
+func (f *Forwarder) localResponse(request *dns.Msg) *dns.Msg {
 	if len(request.Question) != 1 {
 		return nil
 	}
@@ -94,7 +97,7 @@ func localResponse(request *dns.Msg) *dns.Msg {
 			Class:  dns.ClassINET,
 			Ttl:    localTTL,
 		},
-		A: net.ParseIP(localAddress).To4(),
+		A: f.localAddress,
 	}}
 	return response
 }

@@ -10,6 +10,11 @@ import (
 )
 
 func TestLocalResponse(t *testing.T) {
+	handler, err := New("127.0.0.1:53", "192.168.11.48", time.Second)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
 	for _, name := range []string{
 		"blog.kota-yata.com.",
 		"www.kota-yata.com.",
@@ -19,7 +24,7 @@ func TestLocalResponse(t *testing.T) {
 			request := new(dns.Msg)
 			request.SetQuestion(name, dns.TypeA)
 
-			response := localResponse(request)
+			response := handler.localResponse(request)
 			if response == nil {
 				t.Fatal("localResponse() returned nil")
 			}
@@ -30,8 +35,8 @@ func TestLocalResponse(t *testing.T) {
 			if !ok {
 				t.Fatalf("answer type = %T, want *dns.A", response.Answer[0])
 			}
-			if got := answer.A.String(); got != localAddress {
-				t.Fatalf("address = %s, want %s", got, localAddress)
+			if got := answer.A.String(); got != "192.168.11.48" {
+				t.Fatalf("address = %s, want 192.168.11.48", got)
 			}
 		})
 	}
@@ -57,7 +62,10 @@ func TestNonMatchingQueriesAreForwarded(t *testing.T) {
 		}
 	}))
 
-	handler := New(upstream, time.Second)
+	handler, err := New(upstream, "192.168.11.48", time.Second)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
 	for _, test := range []struct {
 		name  string
 		qtype uint16

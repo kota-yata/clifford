@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,13 +17,16 @@ import (
 )
 
 const (
-	listenAddress  = ":53"
 	upstreamServer = "8.8.8.8:53"
 	queryTimeout   = 5 * time.Second
 )
 
-func run(ctx context.Context) error {
-	handler := dnsforwarder.New(upstreamServer, queryTimeout)
+func run(ctx context.Context, localAddress string) error {
+	handler, err := dnsforwarder.New(upstreamServer, localAddress, queryTimeout)
+	if err != nil {
+		return err
+	}
+	listenAddress := net.JoinHostPort(localAddress, "53")
 	servers := []*dns.Server{
 		{Addr: listenAddress, Net: "udp", Handler: handler},
 		{Addr: listenAddress, Net: "tcp", Handler: handler},
@@ -53,10 +58,16 @@ func run(ctx context.Context) error {
 }
 
 func main() {
+	localAddress := flag.String("local-address", "", "IPv4 address to listen on and return for local A records")
+	flag.Parse()
+	if *localAddress == "" {
+		log.Fatal("-local-address is required")
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := run(ctx); err != nil {
+	if err := run(ctx, *localAddress); err != nil {
 		log.Fatal(err)
 	}
 }
