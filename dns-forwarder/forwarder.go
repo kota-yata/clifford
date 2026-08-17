@@ -19,17 +19,17 @@ var localNames = map[string]struct{}{
 }
 
 type Forwarder struct {
-	upstream     string
-	localAddress net.IP
-	timeout      time.Duration
+	upstream      string
+	answerAddress net.IP
+	timeout       time.Duration
 }
 
-func New(upstream, localAddress string, timeout time.Duration) (*Forwarder, error) {
-	ip := net.ParseIP(localAddress)
+func New(upstream, answerAddress string, timeout time.Duration) (*Forwarder, error) {
+	ip := net.ParseIP(answerAddress)
 	if ip == nil || ip.To4() == nil {
-		return nil, fmt.Errorf("local address must be an IPv4 address: %q", localAddress)
+		return nil, fmt.Errorf("answer address must be an IPv4 address: %q", answerAddress)
 	}
-	return &Forwarder{upstream: upstream, localAddress: ip.To4(), timeout: timeout}, nil
+	return &Forwarder{upstream: upstream, answerAddress: ip.To4(), timeout: timeout}, nil
 }
 
 func (f *Forwarder) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
@@ -97,7 +97,7 @@ func (f *Forwarder) localResponse(request *dns.Msg) *dns.Msg {
 			Class:  dns.ClassINET,
 			Ttl:    localTTL,
 		},
-		A: f.localAddress,
+		A: f.answerAddress,
 	}}
 	return response
 }

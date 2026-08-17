@@ -3,7 +3,8 @@ SHELL := /bin/sh
 BIN_DIR := $(CURDIR)/.bin
 RUN_DIR := $(CURDIR)/.run
 LOG_DIR := $(CURDIR)/.logs
-LOCAL_ADDRESS ?=
+BIND_ADDRESS ?=
+ANSWER_ADDRESS ?=
 
 DNS_FORWARDER_BIN := $(BIN_DIR)/dns-forwarder
 VERCEL_UPDATER_BIN := $(BIN_DIR)/vercel-updater
@@ -33,8 +34,9 @@ start: start-dns-forwarder start-vercel-updater
 
 start-dns-forwarder: $(DNS_FORWARDER_BIN)
 	@mkdir -p "$(RUN_DIR)" "$(LOG_DIR)"
-	@if [ -z "$(LOCAL_ADDRESS)" ]; then \
-		echo "LOCAL_ADDRESS is required (example: make start LOCAL_ADDRESS=192.168.11.48)"; \
+	@if [ -z "$(BIND_ADDRESS)" ] || [ -z "$(ANSWER_ADDRESS)" ]; then \
+		echo "BIND_ADDRESS and ANSWER_ADDRESS are required"; \
+		echo "example: make start BIND_ADDRESS=192.168.11.10 ANSWER_ADDRESS=192.168.11.48"; \
 		exit 1; \
 	fi; \
 	if [ -f "$(DNS_FORWARDER_PID)" ]; then \
@@ -46,7 +48,7 @@ start-dns-forwarder: $(DNS_FORWARDER_BIN)
 		rm -f "$(DNS_FORWARDER_PID)"; \
 	fi; \
 	cd "$(CURDIR)"; \
-	nohup "$(DNS_FORWARDER_BIN)" -local-address "$(LOCAL_ADDRESS)" >>"$(DNS_FORWARDER_LOG)" 2>&1 & \
+	nohup "$(DNS_FORWARDER_BIN)" -bind-address "$(BIND_ADDRESS)" -answer-address "$(ANSWER_ADDRESS)" >>"$(DNS_FORWARDER_LOG)" 2>&1 & \
 	pid=$$!; \
 	echo "$$pid" >"$(DNS_FORWARDER_PID)"; \
 	sleep 1; \

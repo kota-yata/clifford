@@ -21,12 +21,15 @@ const (
 	queryTimeout   = 5 * time.Second
 )
 
-func run(ctx context.Context, localAddress string) error {
-	handler, err := dnsforwarder.New(upstreamServer, localAddress, queryTimeout)
+func run(ctx context.Context, bindAddress, answerAddress string) error {
+	if net.ParseIP(bindAddress) == nil {
+		return fmt.Errorf("bind address must be an IP address: %q", bindAddress)
+	}
+	handler, err := dnsforwarder.New(upstreamServer, answerAddress, queryTimeout)
 	if err != nil {
 		return err
 	}
-	listenAddress := net.JoinHostPort(localAddress, "53")
+	listenAddress := net.JoinHostPort(bindAddress, "53")
 	servers := []*dns.Server{
 		{Addr: listenAddress, Net: "udp", Handler: handler},
 		{Addr: listenAddress, Net: "tcp", Handler: handler},
@@ -58,16 +61,20 @@ func run(ctx context.Context, localAddress string) error {
 }
 
 func main() {
-	localAddress := flag.String("local-address", "", "IPv4 address to listen on and return for local A records")
+	bindAddress := flag.String("bind-address", "", "IP address on which the DNS server listens")
+	answerAddress := flag.String("answer-address", "", "IPv4 address returned for overridden A records")
 	flag.Parse()
-	if *localAddress == "" {
-		log.Fatal("-local-address is required")
+	if *bindAddress == "" {
+		log.Fatal("-bind-address is required")
+	}
+	if *answerAddress == "" {
+		log.Fatal("-answer-address is required")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := run(ctx, *localAddress); err != nil {
+	if err := run(ctx, *bindAddress, *answerAddress); err != nil {
 		log.Fatal(err)
 	}
 }
