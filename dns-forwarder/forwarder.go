@@ -1,26 +1,18 @@
-package main
+package dnsforwarder
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/miekg/dns"
 )
 
 const (
-	listenAddress  = ":53"
-	upstreamServer = "8.8.8.8:53"
-	localAddress   = "192.168.11.48"
-	localTTL       = 60
-	queryTimeout   = 5 * time.Second
+	localAddress = "192.168.11.48"
+	localTTL     = 60
 )
 
 var localNames = map[string]struct{}{
@@ -28,12 +20,16 @@ var localNames = map[string]struct{}{
 	"www.kota-yata.com.":  {},
 }
 
-type forwarder struct {
+type Forwarder struct {
 	upstream string
 	timeout  time.Duration
 }
 
-func (f *forwarder) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
+func New(upstream string, timeout time.Duration) *Forwarder {
+	return &Forwarder{upstream: upstream, timeout: timeout}
+}
+
+func (f *Forwarder) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	if response := localResponse(request); response != nil {
 		writeResponse(w, response)
 		return
@@ -54,7 +50,7 @@ func (f *forwarder) ServeDNS(w dns.ResponseWriter, request *dns.Msg) {
 	writeResponse(w, response)
 }
 
-func (f *forwarder) exchange(request *dns.Msg, network string) (*dns.Msg, error) {
+func (f *Forwarder) exchange(request *dns.Msg, network string) (*dns.Msg, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), f.timeout)
 	defer cancel()
 
@@ -106,46 +102,5 @@ func localResponse(request *dns.Msg) *dns.Msg {
 func writeResponse(w dns.ResponseWriter, response *dns.Msg) {
 	if err := w.WriteMsg(response); err != nil {
 		log.Printf("write DNS response: %v", err)
-	}
-}
-
-func run(ctx context.Context) error {
-	handler := &forwarder{upstream: upstreamServer, timeout: queryTimeout}
-	servers := []*dns.Server{
-		{Addr: listenAddress, Net: "udp", Handler: handler},
-		{Addr: listenAddress, Net: "tcp", Handler: handler},
-	}
-
-	serverErrors := make(chan error, len(servers))
-	for _, server := range servers {
-		server := server
-		go func() {
-			serverErrors <- server.ListenAndServe()
-		}()
-	}
-
-	var runErr error
-	select {
-	case err := <-serverErrors:
-		runErr = fmt.Errorf("start DNS server: %w", err)
-	case <-ctx.Done():
-	}
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), queryTimeout)
-	defer cancel()
-	for _, server := range servers {
-		if err := server.ShutdownContext(shutdownCtx); err != nil {
-			runErr = errors.Join(runErr, fmt.Errorf("shut down DNS server: %w", err))
-		}
-	}
-	return runErr
-}
-
-func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	if err := run(ctx); err != nil {
-		log.Fatal(err)
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package dnsforwarder
 
 import (
 	"net"
@@ -57,7 +57,7 @@ func TestNonMatchingQueriesAreForwarded(t *testing.T) {
 		}
 	}))
 
-	handler := &forwarder{upstream: upstream, timeout: time.Second}
+	handler := New(upstream, time.Second)
 	for _, test := range []struct {
 		name  string
 		qtype uint16

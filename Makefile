@@ -10,7 +10,7 @@ DNS_FORWARDER_PID := $(RUN_DIR)/dns-forwarder.pid
 VERCEL_UPDATER_PID := $(RUN_DIR)/vercel-updater.pid
 DNS_FORWARDER_LOG := $(LOG_DIR)/dns-forwarder.log
 VERCEL_UPDATER_LOG := $(LOG_DIR)/vercel-updater.log
-DNS_FORWARDER_SOURCES := $(shell find dns-forwarder -type f -name '*.go')
+DNS_FORWARDER_SOURCES := $(shell find dns-forwarder cmd/dns-forwarder -type f -name '*.go')
 VERCEL_UPDATER_SOURCES := $(shell find vercel-updater cmd/vercel-updater -type f -name '*.go')
 
 .PHONY: build start stop restart \
@@ -22,7 +22,7 @@ build: $(DNS_FORWARDER_BIN) $(VERCEL_UPDATER_BIN)
 
 $(DNS_FORWARDER_BIN): go.mod go.sum $(DNS_FORWARDER_SOURCES)
 	@mkdir -p "$(BIN_DIR)"
-	go build -o "$(DNS_FORWARDER_BIN)" ./dns-forwarder
+	go build -o "$(DNS_FORWARDER_BIN)" ./cmd/dns-forwarder
 
 $(VERCEL_UPDATER_BIN): go.mod go.sum $(VERCEL_UPDATER_SOURCES)
 	@mkdir -p "$(BIN_DIR)"
